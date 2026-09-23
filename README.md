@@ -69,13 +69,12 @@ uploads/                Photos d’identité
 
 1. Créer un compte sur https://www.infinityfree.com puis un site (sous-domaine gratuit).
 2. Dans « MySQL Databases », créer une base et noter : hôte, nom de la base, utilisateur, mot de passe.
-3. Dans phpMyAdmin de l’hébergeur, importer `database/schema.sql` **après avoir retiré** les deux premières lignes `CREATE DATABASE` et `USE` (la base existe déjà).
-4. Copier `config.local.example.php` en `config.local.php` et y mettre les accès de l’étape 2.
-5. Envoyer tous les fichiers dans `htdocs/` (gestionnaire de fichiers ou FTP avec FileZilla).
-6. Ouvrir `https://votre-site/install.php` pour créer les comptes, puis supprimer `install.php`.
+3. Copier `config.local.example.php` en `config.local.php` et y mettre les accès de l’étape 2.
+4. Envoyer tous les fichiers dans `htdocs/` (gestionnaire de fichiers ou FTP avec FileZilla).
+5. Ouvrir `https://votre-site/install.php` pour créer les tables et les comptes, puis supprimer `install.php`.
 
 ## Mise en production
 
-- Changer les mots de passe et le compte MySQL (`config.php`).
+- Changer les mots de passe des comptes et mettre les accès MySQL dans `config.local.php`.
 - Servir le site en HTTPS.
 - Sauvegarder chaque jour : `mysqldump -u root -p ccad > ccad-AAAAMMJJ.sql`.
