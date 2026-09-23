@@ -11,10 +11,14 @@ try {
     $pdo = new PDO('mysql:host=' . DB_HOST . ';port=' . DB_PORT . ';charset=' . DB_CHARSET, DB_USER, DB_PASS, [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
     ]);
+    // En local on crée la base ; chez un hébergeur elle existe déjà (droit CREATE souvent refusé)
+    try { $pdo->exec('CREATE DATABASE IF NOT EXISTS `' . DB_NAME . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'); } catch (PDOException $e) {}
+    $pdo->exec('USE `' . DB_NAME . '`');
 
     // 1. Schéma
     $sql = file_get_contents(__DIR__ . '/database/schema.sql');
     $sql = preg_replace('/^\s*--.*$/m', '', $sql);
+    $sql = preg_replace('/^\s*(CREATE DATABASE|USE)\b[^;]*;/mi', '', $sql);
     foreach (array_filter(array_map('trim', explode(';', $sql))) as $stmt) {
         $pdo->exec($stmt);
     }
