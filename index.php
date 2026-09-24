@@ -32,6 +32,7 @@ for ($i = 8; $i >= 0; $i--) {
     $d = (new DateTime('first day of this month'))->modify("-$i month");
     $barres[] = ['label' => $moisNoms[(int)$d->format('n') - 1], 'val' => (float)($parMois[$d->format('Y-m')] ?? 0)];
 }
+$aucunEnc = !array_sum(array_column($barres, 'val'));
 $max = max(array_column($barres, 'val')) ?: 1;
 
 // Échéances / retards
@@ -100,8 +101,11 @@ require __DIR__ . '/includes/header.php';
 <div class="cols">
   <div class="col-main">
     <section class="card">
-      <div class="card-head"><div><h2>Tendance des encaissements</h2><div class="sub">Neuf derniers mois · <?= e($devise) ?> · maximum <?= money($max) ?></div></div></div>
+      <div class="card-head"><div><h2>Tendance des encaissements</h2><div class="sub">Neuf derniers mois · <?= e($devise) ?><?= $aucunEnc ? '' : ' · maximum ' . money($max) ?></div></div></div>
       <div class="card-body">
+        <?php if ($aucunEnc): ?>
+          <div class="empty"><h3>Aucun encaissement</h3><p>Le graphique apparaîtra dès le premier paiement enregistré.</p></div>
+        <?php else: ?>
         <div class="bars">
           <?php foreach ($barres as $b): ?>
             <div class="bar-col" title="<?= e($b['label'] . ' — ' . money($b['val']) . ' ' . $devise) ?>">
@@ -110,6 +114,7 @@ require __DIR__ . '/includes/header.php';
             </div>
           <?php endforeach; ?>
         </div>
+        <?php endif; ?>
       </div>
     </section>
 

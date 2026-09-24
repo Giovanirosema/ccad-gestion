@@ -1,11 +1,6 @@
-# Les photos téléversées ne doivent jamais être exécutées
-<FilesMatch "\.(php|phtml|php\d|phar|pl|py|cgi|sh)$">
-  Require all denied
-</FilesMatch>
+# Photos d'identité : jamais servies directement, uniquement via photo.php (connexion obligatoire)
+Require all denied
 Options -Indexes -ExecCGI
 <IfModule mod_php.c>
-  php_flag engine off
-</IfModule>
-<IfModule mod_php7.c>
   php_flag engine off
 </IfModule>

@@ -59,7 +59,10 @@ foreach (array_slice(explode(' ', $u['nom']), 0, 2) as $w) $initials .= mb_subst
         <?php endif; ?>
       <?php endforeach; ?>
     </nav>
-    <a class="nav-logout" href="logout.php"><?= icon('logout', 16) ?> Se déconnecter</a>
+    <div class="nav-foot">
+      <a class="nav-item<?= $active === 'compte' ? ' is-active' : '' ?>" href="mon-compte.php"><?= icon('user') ?><span>Mon compte</span></a>
+      <form method="post" action="logout.php"><?= csrf_field() ?><button class="nav-logout" type="submit"><?= icon('logout', 16) ?> Se déconnecter</button></form>
+    </div>
   </aside>
 
   <div class="main">
@@ -70,10 +73,10 @@ foreach (array_slice(explode(' ', $u['nom']), 0, 2) as $w) $initials .= mb_subst
         <input name="q" value="<?= e($_GET['q'] ?? '') ?>" placeholder="Rechercher un assuré, une police, un reçu">
       </form>
       <div class="spacer"></div>
-      <div class="user-chip">
+      <a class="user-chip" href="mon-compte.php" title="Mon compte">
         <div class="avatar avatar-brand"><?= e(mb_strtoupper($initials)) ?></div>
         <div class="user-meta"><div class="user-name"><?= e($u['nom']) ?></div><div class="user-role"><?= e($u['role']) ?></div></div>
-      </div>
+      </a>
     </header>
 
     <main class="content">

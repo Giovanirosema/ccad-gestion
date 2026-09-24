@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS users (
   zone          VARCHAR(120) NULL,
   actif         TINYINT(1)   NOT NULL DEFAULT 1,
   derniere_connexion DATETIME NULL,
+  doit_changer_mdp TINYINT(1) NOT NULL DEFAULT 0,
+  mdp_change_le DATETIME NULL,
   created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
@@ -188,6 +190,16 @@ CREATE TABLE IF NOT EXISTS reclamations (
   created_at     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_recl_assure FOREIGN KEY (assure_id)  REFERENCES assures(id) ON DELETE CASCADE,
   CONSTRAINT fk_recl_user   FOREIGN KEY (created_by) REFERENCES users(id)   ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- Tentatives de connexion (anti force brute)
+CREATE TABLE IF NOT EXISTS login_tentatives (
+  id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  ip         VARCHAR(45)  NOT NULL,
+  login      VARCHAR(60)  NOT NULL,
+  created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_ip (ip, created_at),
+  KEY idx_login (login, created_at)
 ) ENGINE=InnoDB;
 
 -- Journal d'audit (non modifiable par l'application)

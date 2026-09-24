@@ -71,8 +71,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (post('departement') !== '' && !isset(DEPARTEMENTS[post('departement')])) throw new RuntimeException('Département invalide.');
                 if ($role !== 'Administrateur' && post('departement') === '') throw new RuntimeException('Un département est requis pour ce rôle.');
                 $mdp = (string)post('password');
-                if (!$uid && strlen($mdp) < 8) throw new RuntimeException('Mot de passe de 8 caractères minimum.');
-                if ($uid && $mdp !== '' && strlen($mdp) < 8) throw new RuntimeException('Mot de passe de 8 caractères minimum.');
+                if (!$uid && $mdp === '') throw new RuntimeException('Un mot de passe provisoire est obligatoire.');
+                if ($mdp !== '' && ($msgMdp = erreur_mdp($mdp, post('login')))) throw new RuntimeException($msgMdp);
+                if (!preg_match('/^[a-z0-9._-]{3,60}$/i', post('login'))) throw new RuntimeException('Identifiant : 3 à 60 caractères (lettres, chiffres, point, tiret).');
                 if ((int)scalar('SELECT COUNT(*) FROM users WHERE login = ? AND id <> ?', [post('login'), $uid])) throw new RuntimeException('Cet identifiant est déjà utilisé.');
                 if ($uid === (int)$u['id'] && (!post('actif') || $role !== 'Administrateur')) throw new RuntimeException('Vous ne pouvez pas désactiver ni rétrograder votre propre compte.');
                 $vals = [post('nom'), post('login'), $role, post('telephone') ?: null, post('email') ?: null, post('departement') ?: null,
@@ -80,9 +81,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($uid) {
                     db()->prepare('UPDATE users SET nom=?, login=?, role=?, telephone=?, email=?, departement=?, commune=?, zone=?, actif=? WHERE id=?')
                         ->execute(array_merge($vals, [$uid]));
-                    if ($mdp !== '') db()->prepare('UPDATE users SET password_hash = ? WHERE id = ?')->execute([password_hash($mdp, PASSWORD_DEFAULT), $uid]);
+                    if ($mdp !== '') {
+                        $nouveauHash = password_hash($mdp, PASSWORD_DEFAULT);
+                        $soiMeme = $uid === (int)$u['id'];
+                        db()->prepare('UPDATE users SET password_hash = ?, doit_changer_mdp = ?, mdp_change_le = NOW() WHERE id = ?')
+                            ->execute([$nouveauHash, $soiMeme ? 0 : 1, $uid]);
+                        // Garde sa propre session ouverte ; celles de l'utilisateur modifié sont fermées
+                        if ($soiMeme) $_SESSION['empreinte'] = hash('sha256', $nouveauHash);
+                    }
                 } else {
-                    db()->prepare('INSERT INTO users (nom, login, role, telephone, email, departement, commune, zone, actif, password_hash) VALUES (?,?,?,?,?,?,?,?,?,?)')
+                    db()->prepare('INSERT INTO users (nom, login, role, telephone, email, departement, commune, zone, actif, password_hash, doit_changer_mdp) VALUES (?,?,?,?,?,?,?,?,?,?,1)')
                         ->execute(array_merge($vals, [password_hash($mdp, PASSWORD_DEFAULT)]));
                 }
                 audit('Utilisateur', post('login'), ($uid ? 'Compte modifié' : 'Compte créé') . ' · ' . $role . ($mdp !== '' && $uid ? ' · mot de passe réinitialisé' : ''));
@@ -276,7 +284,8 @@ require __DIR__ . '/includes/header.php';
       <form method="post" class="card-body stack"><?= csrf_field() . $tabField ?><input type="hidden" name="action" value="user_save"><input type="hidden" name="id" value="<?= (int)($edit['id'] ?? 0) ?>">
         <div class="field"><label>Nom complet</label><input class="input" name="nom" required value="<?= $ev('nom') ?>"></div>
         <div class="field"><label>Identifiant</label><input class="input mono" name="login" required value="<?= $ev('login') ?>"></div>
-        <div class="field"><label><?= $edit ? 'Nouveau mot de passe (laisser vide)' : 'Mot de passe' ?></label><input class="input" type="password" name="password" minlength="8" <?= $edit ? '' : 'required' ?> autocomplete="new-password"></div>
+        <div class="field"><label><?= $edit ? 'Réinitialiser le mot de passe (laisser vide)' : 'Mot de passe provisoire' ?></label><input class="input" type="password" name="password" minlength="10" <?= $edit ? '' : 'required' ?> autocomplete="new-password"></div>
+        <div class="hint">10 caractères min., majuscules, minuscules et chiffres. L’utilisateur devra le changer à sa première connexion.</div>
         <div class="field"><label>Rôle</label><select class="input" name="role"><?= options(array_keys(ROLES), $edit['role'] ?? 'Agent de gestion', false) ?></select></div>
         <div class="field"><label>Département</label><select class="input" name="departement" data-communes="u-commune" data-map="<?= e(json_encode(DEPARTEMENTS, JSON_UNESCAPED_UNICODE)) ?>"><option value="">Tous (administrateur)</option><?= options(array_keys(DEPARTEMENTS), $edit['departement'] ?? '', false) ?></select></div>
         <div class="field"><label>Commune</label><select class="input" id="u-commune" name="commune"><option value=""></option><?= options($commEdit, $edit['commune'] ?? '', false) ?></select></div>
