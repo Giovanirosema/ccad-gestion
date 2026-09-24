@@ -81,7 +81,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $id) {
     $r = $st->fetch();
     if ($r) {
         $act = post('action');
-        if ($act === 'pieces' && in_array($r['statut'], ['En attente', 'À valider'], true)) {
+        if ($act === 'doc_up') {
+            try {
+                if (!in_array(post('piece'), PIECES_RECLAMATION, true)) throw new RuntimeException('Choisissez le type de pièce.');
+                if (in_array($r['statut'], ['Versé', 'Rejeté'], true) && !$peutValider) throw new RuntimeException('Dossier clos : ajout réservé aux administrateurs.');
+                enregistrer_document('document', (int)$r['assure_id'], post('piece'), $id);
+                audit('Pièce ajoutée', $r['reference'], post('piece') . ' · ' . mb_substr((string)($_FILES['document']['name'] ?? ''), 0, 80));
+                // La pièce reçue est cochée ; dossier complet → prêt pour validation
+                $pieces = json_decode($r['pieces'] ?: '[]', true) ?: [];
+                if (!in_array(post('piece'), $pieces, true)) $pieces[] = post('piece');
+                $statut = $r['statut'];
+                if (in_array($statut, ['En attente', 'À valider'], true)) $statut = count($pieces) >= count(PIECES_RECLAMATION) ? 'À valider' : 'En attente';
+                db()->prepare('UPDATE reclamations SET pieces = ?, statut = ? WHERE id = ?')->execute([json_encode(array_values($pieces), JSON_UNESCAPED_UNICODE), $statut, $id]);
+                flash('success', 'Fichier ajouté : ' . post('piece') . '.' . ($statut === 'À valider' && $r['statut'] !== 'À valider' ? ' Dossier complet : prêt pour validation.' : ''));
+            } catch (RuntimeException $ex) {
+                flash('danger', $ex->getMessage());
+            }
+        } elseif ($act === 'doc_del') {
+            if (!peut_supprimer_document()) {
+                flash('danger', 'Seul un administrateur peut retirer une pièce.');
+            } elseif (scalar('SELECT COUNT(*) FROM documents WHERE id = ? AND reclamation_id = ?', [(int)post('doc_id'), $id])) {
+                $d = supprimer_document((int)post('doc_id'));
+                audit('Pièce retirée', $r['reference'], $d['piece'] . ' · ' . $d['nom_original']);
+                flash('warning', 'Fichier retiré du dossier. Mettez à jour la liste des pièces si nécessaire.');
+            }
+        } elseif ($act === 'pieces' && in_array($r['statut'], ['En attente', 'À valider'], true)) {
             $pieces = array_values(array_intersect((array)($_POST['pieces'] ?? []), PIECES_RECLAMATION));
             $statut = count($pieces) === count(PIECES_RECLAMATION) ? 'À valider' : 'En attente';
             db()->prepare('UPDATE reclamations SET pieces = ?, statut = ? WHERE id = ?')->execute([json_encode($pieces, JSON_UNESCAPED_UNICODE), $statut, $id]);
@@ -314,6 +338,12 @@ if ($id) {
             <?php endforeach; ?>
             <?php if ($modifiable): ?><button class="btn btn-secondary btn-sm">Mettre à jour</button><?php endif; ?>
           </form>
+        </section>
+
+        <?php $docsRecl = rows('SELECT * FROM documents WHERE reclamation_id = ? ORDER BY id DESC', [$id]); ?>
+        <section class="card">
+          <div class="card-head"><div><h2>Fichiers du dossier</h2><div class="sub"><?= count($docsRecl) ?> pièce(s) numérisée(s)</div></div><?= icon('file', 18) ?></div>
+          <div class="card-body stack"><?= bloc_documents($docsRecl, PIECES_RECLAMATION, 'doc_up', 'doc_del') ?></div>
         </section>
 
         <?php if ($peutValider && in_array($r['statut'], ['En attente', 'À valider', 'Validé'], true)): ?>

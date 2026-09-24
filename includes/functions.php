@@ -456,6 +456,116 @@ function upload_photo(string $field): ?string
     return $name;
 }
 
+/* ---------- Pièces justificatives (PDF, photos) ---------- */
+
+const DOC_TAILLE_MAX = 5 * 1024 * 1024;
+const DOC_TYPES = ['application/pdf' => 'pdf', 'image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
+
+function docs_dir(): string
+{
+    $d = UPLOAD_DIR . 'docs/';
+    if (!is_dir($d)) mkdir($d, 0755, true);
+    return $d;
+}
+
+/**
+ * Enregistre une pièce téléversée et l'inscrit au dossier.
+ * Retourne l'identifiant du document.
+ */
+function enregistrer_document(string $field, int $assureId, string $piece, ?int $reclamationId = null): int
+{
+    if (empty($_FILES[$field]) || $_FILES[$field]['error'] === UPLOAD_ERR_NO_FILE) throw new RuntimeException('Choisissez un fichier.');
+    $f = $_FILES[$field];
+    if (in_array($f['error'], [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true) || $f['size'] > DOC_TAILLE_MAX) {
+        throw new RuntimeException('Le fichier dépasse 5 Mo.');
+    }
+    if ($f['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($f['tmp_name'])) throw new RuntimeException('Échec du téléversement.');
+
+    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($f['tmp_name']);
+    $ext = DOC_TYPES[$mime] ?? null;
+    if (!$ext) throw new RuntimeException('Format accepté : PDF, JPEG, PNG ou WebP.');
+
+    $nom = bin2hex(random_bytes(16)) . '.' . $ext;
+    $dest = docs_dir() . $nom;
+    if ($ext === 'pdf') {
+        // Un vrai PDF commence par « %PDF- » ; on refuse les fichiers déguisés
+        if (file_get_contents($f['tmp_name'], false, null, 0, 5) !== '%PDF-') throw new RuntimeException('Fichier PDF invalide.');
+        if (!move_uploaded_file($f['tmp_name'], $dest)) throw new RuntimeException('Impossible d’enregistrer le fichier.');
+    } else {
+        // Image ré-encodée : métadonnées supprimées, taille raisonnable
+        $img = @imagecreatefromstring((string)file_get_contents($f['tmp_name']));
+        if (!$img) throw new RuntimeException('Image illisible ou corrompue.');
+        [$w, $h] = [imagesx($img), imagesy($img)];
+        $max = 2000;
+        if ($w > $max || $h > $max) {
+            $r = min($max / $w, $max / $h);
+            $img = imagescale($img, (int)round($w * $r), (int)round($h * $r)) ?: $img;
+        }
+        $nom = substr($nom, 0, -strlen($ext)) . 'jpg';
+        $dest = docs_dir() . $nom;
+        $mime = 'image/jpeg';
+        $ok = imagejpeg($img, $dest, 85);
+        imagedestroy($img);
+        if (!$ok) throw new RuntimeException('Impossible d’enregistrer le fichier.');
+    }
+
+    $original = mb_substr(preg_replace('/[^\p{L}\p{N} ._()-]/u', '_', basename((string)$f['name'])), 0, 160) ?: 'document';
+    db()->prepare('INSERT INTO documents (assure_id, reclamation_id, piece, fichier, nom_original, mime, taille, created_by) VALUES (?,?,?,?,?,?,?,?)')
+        ->execute([$assureId, $reclamationId, $piece, $nom, $original, $mime, filesize($dest), current_user()['id'] ?? null]);
+    return (int)db()->lastInsertId();
+}
+
+function supprimer_document(int $docId): ?array
+{
+    $st = db()->prepare('SELECT * FROM documents WHERE id = ?');
+    $st->execute([$docId]);
+    $d = $st->fetch();
+    if (!$d) return null;
+    db()->prepare('DELETE FROM documents WHERE id = ?')->execute([$docId]);
+    if (preg_match('/^[a-f0-9]{32}\.(pdf|jpg)$/', $d['fichier'])) @unlink(docs_dir() . $d['fichier']);
+    return $d;
+}
+
+function taille_lisible(int $o): string
+{
+    return $o >= 1048576 ? number_format($o / 1048576, 1, ',', ' ') . ' Mo' : max(1, (int)round($o / 1024)) . ' Ko';
+}
+
+/** Seuls les administrateurs peuvent retirer une pièce du dossier (traçabilité). */
+function peut_supprimer_document(): bool
+{
+    return in_array(current_user()['role'] ?? '', ['Administrateur', 'Administrateur départemental'], true);
+}
+
+/** Liste des pièces d'un dossier, avec téléversement et suppression. */
+function bloc_documents(array $docs, array $pieces, string $actionUp, string $actionDel, array $champsCaches = []): string
+{
+    $cache = '';
+    foreach ($champsCaches as $k => $v) $cache .= '<input type="hidden" name="' . e($k) . '" value="' . e($v) . '">';
+    $html = '';
+    foreach ($docs as $d) {
+        $html .= '<div class="doc-item"><span class="doc-ic ' . ($d['mime'] === 'application/pdf' ? 'pdf' : 'img') . '">'
+            . ($d['mime'] === 'application/pdf' ? 'PDF' : 'IMG') . '</span><div class="doc-meta"><a href="document.php?id=' . (int)$d['id']
+            . '" target="_blank" rel="noopener">' . e($d['piece']) . '</a><div class="d">' . e($d['nom_original']) . ' · ' . taille_lisible((int)$d['taille'])
+            . ' · ' . date('d/m/Y', strtotime($d['created_at'])) . '</div></div>';
+        if (peut_supprimer_document()) {
+            $html .= '<form method="post">' . csrf_field() . $cache . '<input type="hidden" name="action" value="' . e($actionDel) . '">'
+                . '<input type="hidden" name="doc_id" value="' . (int)$d['id'] . '"><button class="icon-btn danger" title="Retirer" data-confirm="Retirer ce fichier du dossier ?">'
+                . icon('trash', 16) . '</button></form>';
+        }
+        $html .= '</div>';
+    }
+    if (!$docs) $html .= '<div class="muted small">Aucun fichier au dossier.</div>';
+    $html .= '<form method="post" enctype="multipart/form-data" class="doc-upload">' . csrf_field() . $cache
+        . '<input type="hidden" name="action" value="' . e($actionUp) . '">'
+        . '<select class="input" name="piece" required><option value="">Type de pièce…</option>' . options($pieces, null, false) . '</select>'
+        . '<label class="file-label"><input type="file" name="document" required accept="application/pdf,image/jpeg,image/png,image/webp" data-file-name> '
+        . icon('download', 14) . ' <span>Choisir un fichier</span></label>'
+        . '<button class="btn btn-primary btn-sm" type="submit">Ajouter au dossier</button>'
+        . '<div class="hint">PDF ou photo · 5 Mo maximum</div></form>';
+    return $html;
+}
+
 /* ---------- Composants d'affichage ---------- */
 
 function badge(?string $statut): string
@@ -503,6 +613,8 @@ function icon(string $name, int $size = 18): string
         'download' => '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
         'user' => '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
         'lock' => '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+        'edit' => '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+        'swap' => '<path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/>',
         'check' => '<path d="M20 6 9 17l-5-5"/>',
         'trend' => '<path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/>',
     ][$name] ?? '';

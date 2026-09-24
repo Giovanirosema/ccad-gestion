@@ -11,8 +11,8 @@ RedirectMatch 404 /\.git
 
 # Envoi de fichiers et formulaires : taille maximale
 <IfModule mod_php.c>
-  php_value upload_max_filesize 3M
-  php_value post_max_size 8M
+  php_value upload_max_filesize 6M
+  php_value post_max_size 16M
   php_flag expose_php off
 </IfModule>
 

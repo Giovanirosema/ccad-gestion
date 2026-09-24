@@ -76,6 +76,25 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   updateParts();
 
+  // Ouvrir / fermer un formulaire de modification (ligne ou bloc)
+  document.querySelectorAll('[data-toggle-row]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const el = document.getElementById(btn.dataset.toggleRow);
+      if (!el) return;
+      el.hidden = !el.hidden;
+      if (!el.hidden) { const f = el.querySelector('input:not([type=hidden]), select'); if (f) f.focus(); }
+    });
+  });
+
+  // Nom du fichier choisi
+  document.querySelectorAll('[data-file-name]').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const span = inp.parentElement.querySelector('span');
+      if (span && inp.files[0]) span.textContent = inp.files[0].name.length > 28 ? inp.files[0].name.slice(0, 25) + '…' : inp.files[0].name;
+      if (inp.files[0] && inp.files[0].size > 5 * 1024 * 1024) { alert('Ce fichier dépasse 5 Mo.'); inp.value = ''; if (span) span.textContent = 'Choisir un fichier'; }
+    });
+  });
+
   // Afficher / masquer un mot de passe
   document.querySelectorAll('[data-pw-toggle]').forEach(btn => {
     btn.addEventListener('click', () => {
