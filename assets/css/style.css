@@ -272,3 +272,4 @@ dl.kv dt:nth-last-child(2), dl.kv dd:last-child { border-bottom:0; }
   .content { padding:0; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation:none !important; transition:none !important; } }
+.seal { border-radius:50%; object-fit:cover; background:#fff; flex-shrink:0; display:block; }

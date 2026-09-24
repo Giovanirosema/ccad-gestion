@@ -386,10 +386,7 @@ function icon(string $name, int $size = 18): string
 
 function seal(int $size = 40): string
 {
-    return '<svg class="seal" width="' . $size . '" height="' . $size . '" viewBox="0 0 100 100" aria-label="Sceau CCAD">'
-        . '<circle cx="50" cy="50" r="50" fill="#12276e"/><circle cx="50" cy="50" r="40" fill="#fff"/>'
-        . '<circle cx="50" cy="50" r="36" fill="none" stroke="#c4923f" stroke-width="2"/>'
-        . '<text x="50" y="60" text-anchor="middle" font-family="Georgia,serif" font-size="28" font-weight="700" fill="#12276e">CCAD</text></svg>';
+    return '<img class="seal" src="assets/img/logo-ccad.jpg" width="' . $size . '" height="' . $size . '" alt="Logo CCAD">';
 }
 
 function stat_card(string $label, string $value, string $unit, string $delta = '', string $tone = '', string $ic = 'chart'): string

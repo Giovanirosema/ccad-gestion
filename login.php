@@ -33,6 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Connexion · CCAD Gestion interne</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Lora:ital,wght@0,500..700;1,500&family=Public+Sans:wght@300..800&display=swap">
+  <link rel="icon" href="assets/img/logo-ccad.jpg">
   <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>

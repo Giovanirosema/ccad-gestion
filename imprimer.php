@@ -103,6 +103,7 @@ if ($doc !== 'rapport') audit('Impression', $ref, $titre . ' · ' . ($thermal ? 
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><?= e($titre . ' ' . $ref) ?> · CCAD</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Lora:wght@500..700&family=Public+Sans:wght@300..800&display=swap">
+  <link rel="icon" href="assets/img/logo-ccad.jpg">
   <link rel="stylesheet" href="assets/css/style.css">
   <style>
     body { padding:24px 16px; }

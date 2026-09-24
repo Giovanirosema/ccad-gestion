@@ -38,6 +38,7 @@ foreach (array_slice(explode(' ', $u['nom']), 0, 2) as $w) $initials .= mb_subst
   <title><?= e($page_title) ?> · CCAD Gestion interne</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Lora:ital,wght@0,500..700;1,500&family=Public+Sans:wght@300..800&display=swap">
+  <link rel="icon" href="assets/img/logo-ccad.jpg">
   <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
