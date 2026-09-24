@@ -205,6 +205,11 @@ function require_login(): array
 
 function client_ip(): string
 {
+    // Derrière le tunnel, la vraie adresse est transmise par Cloudflare (en-tête accepté seulement depuis 127.0.0.1)
+    if (VIA_TUNNEL) {
+        $ip = $_SERVER['HTTP_CF_CONNECTING_IP'] ?? trim(explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'] ?? '')[0]);
+        if (filter_var($ip, FILTER_VALIDATE_IP)) return $ip;
+    }
     return substr((string)($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0'), 0, 45);
 }
 
@@ -339,7 +344,7 @@ function audit(string $type, string $cible, string $detail): void
     $u = current_user();
     db()->prepare('INSERT INTO audit (user_id, user_nom, zone, type, cible, detail, ip) VALUES (?,?,?,?,?,?,?)')
         ->execute([$u['id'] ?? null, $u['nom'] ?? 'Système', $u['zone'] ?? 'Système', $type, $cible,
-            mb_substr($detail, 0, 255), $_SERVER['REMOTE_ADDR'] ?? null]);
+            mb_substr($detail, 0, 255), client_ip()]);
 }
 
 /* ---------- Références ---------- */
