@@ -76,6 +76,34 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   updateParts();
 
+  // Afficher / masquer un mot de passe
+  document.querySelectorAll('[data-pw-toggle]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const inp = document.getElementById(btn.dataset.pwToggle);
+      const show = inp.type === 'password';
+      inp.type = show ? 'text' : 'password';
+      btn.textContent = show ? 'Masquer' : 'Afficher';
+      inp.focus();
+    });
+  });
+
+  // Force du nouveau mot de passe
+  document.querySelectorAll('[data-pw-strength]').forEach(inp => {
+    const meter = document.getElementById(inp.dataset.pwStrength);
+    const rules = document.querySelector('[data-pw-rules="' + inp.id + '"]');
+    const check = () => {
+      const v = inp.value;
+      const r = { len: v.length >= 10, case: /[a-zà-ÿ]/.test(v) && /[A-ZÀ-Þ]/.test(v), digit: /\d/.test(v) };
+      if (rules) rules.querySelectorAll('[data-rule]').forEach(li => li.classList.toggle('ok', r[li.dataset.rule]));
+      let score = Object.values(r).filter(Boolean).length + (v.length >= 14 ? 1 : 0) + (/[^A-Za-z0-9]/.test(v) ? 1 : 0);
+      if (!v) score = 0;
+      meter.dataset.level = score <= 1 ? 'faible' : score <= 3 ? 'moyen' : 'fort';
+      meter.firstElementChild.style.width = Math.min(100, score * 20) + '%';
+    };
+    inp.addEventListener('input', check);
+    check();
+  });
+
   // Encaissement : montant = prime × mois, mode habituel de l'assuré
   const primeSel = document.querySelector('[data-prime-select]');
   if (primeSel) {

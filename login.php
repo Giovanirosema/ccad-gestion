@@ -4,26 +4,35 @@ require_once __DIR__ . '/includes/functions.php';
 if (current_user()) redirect('index.php');
 
 $erreur = '';
+$info = get('expire') === '1' ? 'Votre session a expiré. Reconnectez-vous.' : (get('sortie') === '1' ? 'Vous êtes déconnecté.' : '');
+$login = mb_substr((string)post('login'), 0, 60);
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     check_csrf();
-    // Limitation simple des tentatives par session
-    $_SESSION['tentatives'] = ($_SESSION['tentatives'] ?? 0) + 1;
-    if ($_SESSION['tentatives'] > 8) {
-        $erreur = 'Trop de tentatives. Réessayez plus tard ou contactez l’administrateur.';
+    if ($minutes = connexion_bloquee($login)) {
+        $erreur = "Trop de tentatives échouées. Réessayez dans $minutes minute(s).";
     } else {
-        $st = db()->prepare('SELECT * FROM users WHERE login = ? AND actif = 1');
-        $st->execute([post('login')]);
+        $st = db()->prepare('SELECT * FROM users WHERE login = ?');
+        $st->execute([$login]);
         $user = $st->fetch();
-        if ($user && password_verify((string)post('password'), $user['password_hash'])) {
-            session_regenerate_id(true);
-            unset($user['password_hash']);
-            $_SESSION['user'] = $user;
-            $_SESSION['tentatives'] = 0;
+        // Vérification même si le compte n'existe pas : même durée de réponse, pas d'indice sur les identifiants valides
+        $hash = $user['password_hash'] ?? password_hash(random_bytes(16), PASSWORD_DEFAULT);
+        $ok = password_verify((string)post('password'), $hash);
+        if ($ok && $user && $user['actif']) {
+            if (password_needs_rehash($hash, PASSWORD_DEFAULT)) {
+                $hash = password_hash((string)post('password'), PASSWORD_DEFAULT);
+                db()->prepare('UPDATE users SET password_hash = ? WHERE id = ?')->execute([$hash, $user['id']]);
+            }
+            effacer_echecs($login);
+            ouvrir_session($user, $hash);
             db()->prepare('UPDATE users SET derniere_connexion = NOW() WHERE id = ?')->execute([$user['id']]);
             audit('Connexion', $user['login'], 'Ouverture de session');
-            redirect('index.php');
+            redirect($user['doit_changer_mdp'] ? 'mon-compte.php?obligatoire=1' : 'index.php');
         }
+        noter_echec($login);
+        audit('Échec connexion', $login !== '' ? $login : '—', $user && !$user['actif'] ? 'Compte désactivé' : 'Identifiant ou mot de passe incorrect');
         $erreur = 'Identifiant ou mot de passe incorrect.';
+        if ($user && $ok && !$user['actif']) $erreur = 'Ce compte est désactivé. Contactez l’administrateur.';
     }
 }
 ?><!DOCTYPE html>
@@ -31,7 +40,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
   <title>Connexion · CCAD Gestion interne</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Lora:ital,wght@0,500..700;1,500&family=Public+Sans:wght@300..800&display=swap">
   <link rel="icon" href="assets/img/logo-ccad.jpg">
   <link rel="stylesheet" href="assets/css/style.css">
@@ -39,41 +50,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
 <div class="auth">
   <div class="auth-left">
+    <img class="auth-watermark" src="assets/img/logo-ccad.jpg" alt="">
     <div class="row">
-      <?= seal(92) ?>
+      <?= seal(64) ?>
       <div>
-        <div style="font-size:20px;font-weight:700;letter-spacing:.04em">CCAD</div>
-        <div style="font-size:12px;color:rgba(255,255,255,.72)">Confiance, Compagnie d’Assurance de Décès · Camp-Perrin</div>
+        <div class="auth-brand">CCAD</div>
+        <div class="auth-brand-sub">Confiance, Compagnie d’Assurance de Décès</div>
       </div>
     </div>
-    <div style="max-width:420px">
+    <div class="auth-hero">
       <div class="auth-rule"></div>
       <h1>Application de gestion interne</h1>
-      <p style="margin-top:14px;color:rgba(255,255,255,.78)">Accès réservé au personnel autorisé. Les données des assurés ne quittent pas cet espace.</p>
-      <p style="font-style:italic;color:var(--gold-300)">« <?= e(setting('org_slogan')) ?> »</p>
+      <p>Adhésions, cotisations, relances et réclamations, réunies en un seul espace sécurisé.</p>
+      <blockquote>« <?= e(setting('org_slogan')) ?> »</blockquote>
     </div>
-    <div class="mono" style="font-size:11px;color:rgba(255,255,255,.55)"><?= e(setting('org_adresse')) ?> · <?= e(setting('org_tel')) ?> · v<?= APP_VERSION ?></div>
+    <div class="auth-foot mono"><?= e(setting('org_adresse')) ?> · <?= e(setting('org_tel')) ?></div>
   </div>
   <div class="auth-right">
-    <form class="auth-form" method="post" autocomplete="on">
+    <form class="auth-card" method="post" autocomplete="on">
       <?= csrf_field() ?>
+      <div class="auth-card-logo"><?= seal(72) ?></div>
       <div>
-        <h2 style="font-size:22px">Connexion</h2>
-        <div class="muted" style="font-size:13px;margin-top:4px">Identifiants fournis par l’administrateur.</div>
+        <h2>Bon retour</h2>
+        <div class="muted">Connectez-vous avec les identifiants fournis par l’administrateur.</div>
       </div>
-      <?php if ($erreur): ?><div class="alert alert-danger"><?= e($erreur) ?></div><?php endif; ?>
+      <?php if ($erreur): ?><div class="alert alert-danger" role="alert"><?= e($erreur) ?></div><?php endif; ?>
+      <?php if ($info && !$erreur): ?><div class="alert alert-info"><?= e($info) ?></div><?php endif; ?>
       <div class="field">
-        <label for="login">Identifiant <span class="req">*</span></label>
-        <input class="input" id="login" name="login" required autofocus value="<?= e(post('login')) ?>">
+        <label for="login">Identifiant</label>
+        <div class="input-icon"><?= icon('user', 16) ?><input class="input" id="login" name="login" required maxlength="60" autocomplete="username" autocapitalize="none" spellcheck="false" autofocus value="<?= e($login) ?>"></div>
       </div>
       <div class="field">
-        <label for="password">Mot de passe <span class="req">*</span></label>
-        <input class="input" id="password" name="password" type="password" required>
+        <label for="password">Mot de passe</label>
+        <div class="input-icon"><?= icon('lock', 16) ?><input class="input" id="password" name="password" type="password" required maxlength="200" autocomplete="current-password">
+          <button type="button" class="pw-toggle" data-pw-toggle="password" aria-label="Afficher le mot de passe">Afficher</button></div>
       </div>
-      <button class="btn btn-primary btn-block" type="submit">Se connecter</button>
-      <div class="muted small">Mot de passe oublié : contacter l’administrateur système.</div>
+      <button class="btn btn-primary btn-block btn-lg" type="submit">Se connecter</button>
+      <div class="auth-note"><?= icon('shield', 14) ?> Accès réservé au personnel · session fermée après <?= (int)(SESSION_TIMEOUT / 60) ?> min d’inactivité</div>
     </form>
   </div>
 </div>
+<script src="assets/js/app.js"></script>
 </body>
 </html>

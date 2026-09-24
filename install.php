@@ -15,6 +15,11 @@ try {
     try { $pdo->exec('CREATE DATABASE IF NOT EXISTS `' . DB_NAME . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'); } catch (PDOException $e) {}
     $pdo->exec('USE `' . DB_NAME . '`');
 
+    // Verrou : une application déjà installée ne peut pas être réinstallée depuis le navigateur
+    $dejaInstalle = (bool)$pdo->query("SHOW TABLES LIKE 'users'")->fetchColumn()
+        && (int)$pdo->query('SELECT COUNT(*) FROM users')->fetchColumn() > 0;
+    if ($dejaInstalle) throw new RuntimeException('L’application est déjà installée. Supprimez install.php du serveur.');
+
     // 1. Schéma
     $sql = file_get_contents(__DIR__ . '/database/schema.sql');
     $sql = preg_replace('/^\s*--.*$/m', '', $sql);
@@ -28,9 +33,9 @@ try {
 
     // 2. Compte administrateur (les autres comptes se créent dans Paramètres › Utilisateurs)
     if ((int)$pdo->query('SELECT COUNT(*) FROM users')->fetchColumn() === 0) {
-        $pdo->prepare('INSERT INTO users (nom, login, password_hash, role, zone) VALUES (?,?,?,?,?)')
+        $pdo->prepare('INSERT INTO users (nom, login, password_hash, role, zone, doit_changer_mdp) VALUES (?,?,?,?,?,1)')
             ->execute(['Administrateur', 'admin', password_hash('ccad2026', PASSWORD_DEFAULT), 'Administrateur', 'Siège']);
-        $log[] = 'Compte « admin » créé (mot de passe provisoire : ccad2026 — à changer dès la première connexion).';
+        $log[] = 'Compte « admin » créé (mot de passe provisoire : ccad2026 — changement obligatoire à la première connexion).';
     }
 
     $ok = true;

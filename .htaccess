@@ -1,0 +1,26 @@
+# CCAD — protections du serveur web (Apache)
+Options -Indexes
+ServerSignature Off
+DirectoryIndex index.php
+
+# Fichiers qui ne doivent jamais être servis
+<FilesMatch "(^\.|\.(sql|md|log|bak|ini|sh|lock|dist)$|^config\.local.*\.php$|^composer\.)">
+  Require all denied
+</FilesMatch>
+RedirectMatch 404 /\.git
+
+# Envoi de fichiers et formulaires : taille maximale
+<IfModule mod_php.c>
+  php_value upload_max_filesize 3M
+  php_value post_max_size 8M
+  php_flag expose_php off
+</IfModule>
+
+# Forcer HTTPS en ligne (ignoré en local)
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTPS} !=on
+  RewriteCond %{HTTP:X-Forwarded-Proto} !https
+  RewriteCond %{HTTP_HOST} !^(localhost|127\.0\.0\.1)(:\d+)?$ [NC]
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>

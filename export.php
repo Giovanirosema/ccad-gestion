@@ -50,5 +50,7 @@ header('Content-Disposition: attachment; filename="' . $nom . '"');
 $out = fopen('php://output', 'w');
 fwrite($out, "\xEF\xBB\xBF"); // BOM pour Excel
 if ($lignes) fputcsv($out, array_keys($lignes[0]), ';');
-foreach ($lignes as $l) fputcsv($out, $l, ';');
+// Neutralise les formules (=, +, -, @) pour éviter l'injection dans Excel
+$sur = fn($v) => is_string($v) && $v !== '' && strpbrk($v[0], "=+-@\t\r") !== false && !is_numeric($v) ? "'" . $v : $v;
+foreach ($lignes as $l) fputcsv($out, array_map($sur, $l), ';');
 fclose($out);

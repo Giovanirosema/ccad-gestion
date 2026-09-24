@@ -165,7 +165,107 @@ function require_login(): array
 {
     $u = current_user();
     if (!$u) redirect('login.php');
-    return $u;
+
+    // Pages protégées : jamais en cache (le bouton « Retour » après déconnexion n'affiche rien)
+    header('Cache-Control: no-store, no-cache, must-revalidate');
+    header('Pragma: no-cache');
+
+    // Déconnexion après inactivité
+    if (time() - ($_SESSION['derniere_activite'] ?? 0) > SESSION_TIMEOUT) {
+        fermer_session();
+        redirect('login.php?expire=1');
+    }
+    $_SESSION['derniere_activite'] = time();
+
+    // Le compte est relu à chaque requête : un compte désactivé ou modifié prend effet immédiatement
+    $st = db()->prepare('SELECT * FROM users WHERE id = ?');
+    $st->execute([$u['id']]);
+    $frais = $st->fetch();
+    if (!$frais || !$frais['actif'] || !hash_equals(hash('sha256', $frais['password_hash']), (string)($_SESSION['empreinte'] ?? ''))) {
+        fermer_session();
+        redirect('login.php?expire=1');
+    }
+    unset($frais['password_hash']);
+    $_SESSION['user'] = $frais;
+
+    // Renouvellement régulier de l'identifiant de session
+    if (time() - ($_SESSION['cree_le'] ?? 0) > 900) {
+        session_regenerate_id(true);
+        $_SESSION['cree_le'] = time();
+    }
+
+    // Mot de passe provisoire : changement obligatoire avant tout accès
+    if ($frais['doit_changer_mdp'] && !in_array(basename($_SERVER['SCRIPT_NAME']), ['mon-compte.php', 'logout.php'], true)) {
+        redirect('mon-compte.php?obligatoire=1');
+    }
+    return $frais;
+}
+
+/* ---------- Sécurité des sessions et des mots de passe ---------- */
+
+function client_ip(): string
+{
+    return substr((string)($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0'), 0, 45);
+}
+
+/** Ouvre la session après une authentification réussie. */
+function ouvrir_session(array $user, string $hash): void
+{
+    session_regenerate_id(true);
+    $_SESSION = [];
+    unset($user['password_hash']);
+    $_SESSION['user'] = $user;
+    // Empreinte du mot de passe : si le mot de passe change, les autres sessions sont fermées
+    $_SESSION['empreinte'] = hash('sha256', $hash);
+    $_SESSION['cree_le'] = $_SESSION['derniere_activite'] = time();
+}
+
+function fermer_session(): void
+{
+    $_SESSION = [];
+    if (ini_get('session.use_cookies')) {
+        $p = session_get_cookie_params();
+        setcookie(session_name(), '', ['expires' => time() - 42000, 'path' => $p['path'], 'secure' => $p['secure'],
+            'httponly' => true, 'samesite' => $p['samesite']]);
+    }
+    session_destroy();
+}
+
+const MAX_ECHECS_COMPTE = 5;   // par identifiant et par adresse IP
+const MAX_ECHECS_IP     = 20;  // toutes identités confondues
+const FENETRE_BLOCAGE   = 15;  // minutes
+
+/** Retourne le nombre de minutes de blocage restantes (0 = autorisé). */
+function connexion_bloquee(string $login): int
+{
+    db()->exec('DELETE FROM login_tentatives WHERE created_at < NOW() - INTERVAL 1 DAY');
+    $ip = client_ip();
+    $parCompte = (int)scalar('SELECT COUNT(*) FROM login_tentatives WHERE ip = ? AND login = ? AND created_at > NOW() - INTERVAL ' . FENETRE_BLOCAGE . ' MINUTE', [$ip, $login]);
+    $parIp = (int)scalar('SELECT COUNT(*) FROM login_tentatives WHERE ip = ? AND created_at > NOW() - INTERVAL ' . FENETRE_BLOCAGE . ' MINUTE', [$ip]);
+    if ($parCompte < MAX_ECHECS_COMPTE && $parIp < MAX_ECHECS_IP) return 0;
+    $plusAncien = scalar('SELECT MIN(created_at) FROM login_tentatives WHERE ip = ? AND created_at > NOW() - INTERVAL ' . FENETRE_BLOCAGE . ' MINUTE', [$ip]);
+    return max(1, FENETRE_BLOCAGE - (int)floor((time() - strtotime($plusAncien)) / 60));
+}
+
+function noter_echec(string $login): void
+{
+    db()->prepare('INSERT INTO login_tentatives (ip, login) VALUES (?, ?)')->execute([client_ip(), mb_substr($login, 0, 60)]);
+}
+
+function effacer_echecs(string $login): void
+{
+    db()->prepare('DELETE FROM login_tentatives WHERE ip = ? AND login = ?')->execute([client_ip(), $login]);
+}
+
+/** Règles de mot de passe. Retourne un message d'erreur, ou null si le mot de passe est acceptable. */
+function erreur_mdp(string $mdp, string $login = ''): ?string
+{
+    if (mb_strlen($mdp) < 10) return 'Le mot de passe doit contenir au moins 10 caractères.';
+    if (!preg_match('/\p{L}/u', $mdp) || !preg_match('/\d/', $mdp)) return 'Le mot de passe doit contenir des lettres et des chiffres.';
+    if (!preg_match('/\p{Lu}/u', $mdp) || !preg_match('/\p{Ll}/u', $mdp)) return 'Le mot de passe doit mélanger majuscules et minuscules.';
+    if ($login !== '' && mb_stripos($mdp, $login) !== false) return 'Le mot de passe ne doit pas contenir l’identifiant.';
+    if (in_array(mb_strtolower($mdp), ['ccad2026', 'motdepasse1', 'password123', 'azerty12345', 'ccadccad2026'], true)) return 'Ce mot de passe est trop courant.';
+    return null;
 }
 
 function can(string $perm): bool
@@ -331,6 +431,22 @@ function upload_photo(string $field): ?string
     if (!$ext) throw new RuntimeException('Format accepté : JPEG, PNG ou WebP.');
     if (!is_dir(UPLOAD_DIR)) mkdir(UPLOAD_DIR, 0755, true);
     $name = bin2hex(random_bytes(12)) . '.' . $ext;
+    if (extension_loaded('gd')) {
+        // Ré-encodage : supprime les métadonnées (position GPS…) et tout contenu caché dans le fichier
+        $img = @imagecreatefromstring((string)file_get_contents($f['tmp_name']));
+        if (!$img) throw new RuntimeException('Image illisible ou corrompue.');
+        [$w, $h] = [imagesx($img), imagesy($img)];
+        $max = 800;
+        if ($w > $max || $h > $max) {
+            $r = min($max / $w, $max / $h);
+            $img = imagescale($img, (int)round($w * $r), (int)round($h * $r)) ?: $img;
+        }
+        $name = bin2hex(random_bytes(12)) . '.jpg';
+        $ok = imagejpeg($img, UPLOAD_DIR . $name, 85);
+        imagedestroy($img);
+        if (!$ok) throw new RuntimeException('Impossible d’enregistrer la photo.');
+        return $name;
+    }
     if (!move_uploaded_file($f['tmp_name'], UPLOAD_DIR . $name)) throw new RuntimeException('Impossible d’enregistrer la photo.');
     return $name;
 }
@@ -380,6 +496,10 @@ function icon(string $name, int $size = 18): string
         'calendar' => '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
         'trash' => '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
         'download' => '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
+        'user' => '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+        'lock' => '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+        'check' => '<path d="M20 6 9 17l-5-5"/>',
+        'trend' => '<path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/>',
     ][$name] ?? '';
     return '<svg class="icon" width="' . $size . '" height="' . $size . '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' . $p . '</svg>';
 }
@@ -392,14 +512,14 @@ function seal(int $size = 40): string
 function stat_card(string $label, string $value, string $unit, string $delta = '', string $tone = '', string $ic = 'chart'): string
 {
     return '<div class="stat' . ($tone === 'brand' ? ' stat-brand' : '') . '"><div class="stat-top"><span class="eyebrow">' . e($label)
-        . '</span>' . icon($ic, 16) . '</div><div class="stat-value"><span class="mono">' . e($value) . '</span> <small>' . e($unit)
+        . '</span><span class="stat-ic">' . icon($ic, 18) . '</span></div><div class="stat-value"><span class="mono">' . e($value) . '</span> <small>' . e($unit)
         . '</small></div>' . ($delta !== '' ? '<div class="stat-delta">' . e($delta) . '</div>' : '') . '</div>';
 }
 
 function photo_frame(?string $photo, string $class = 'photo'): string
 {
     if ($photo && is_file(UPLOAD_DIR . $photo)) {
-        return '<img class="' . $class . '" src="' . e(UPLOAD_URL . $photo) . '" alt="Photo de l’assuré">';
+        return '<img class="' . $class . '" src="photo.php?f=' . rawurlencode($photo) . '" alt="Photo de l’assuré">';
     }
     return '<div class="' . $class . ' photo-empty">Photo<br>96×120</div>';
 }
