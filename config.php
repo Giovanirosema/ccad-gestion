@@ -25,7 +25,10 @@ date_default_timezone_set('America/Port-au-Prince');
 defined('SESSION_TIMEOUT') || define('SESSION_TIMEOUT', 30 * 60);
 
 // Détails des erreurs : seulement en local. En ligne, les erreurs sont journalisées, jamais affichées.
-$enLocal = in_array($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1', ['127.0.0.1', '::1'], true);
+// Une requête relayée par un tunnel (Cloudflare) arrive de 127.0.0.1 mais vient d'Internet
+$depuisBoucle = in_array($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1', ['127.0.0.1', '::1'], true);
+define('VIA_TUNNEL', $depuisBoucle && (isset($_SERVER['HTTP_CF_CONNECTING_IP']) || isset($_SERVER['HTTP_X_FORWARDED_FOR'])));
+$enLocal = $depuisBoucle && !VIA_TUNNEL;
 defined('APP_DEBUG') || define('APP_DEBUG', $enLocal);
 ini_set('display_errors', APP_DEBUG ? '1' : '0');
 ini_set('log_errors', '1');
@@ -44,7 +47,7 @@ if (!APP_DEBUG) {
 }
 
 $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-    || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
+    || (VIA_TUNNEL && (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https' || str_contains($_SERVER['HTTP_CF_VISITOR'] ?? '', 'https')));
 
 if (PHP_SAPI !== 'cli' && !headers_sent()) {
     header('X-Frame-Options: DENY');
