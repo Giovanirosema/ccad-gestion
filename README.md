@@ -26,6 +26,8 @@ install.php             Installation (à supprimer ensuite)
 index.php               Tableau de bord
 assures.php             Liste des assurés
 assure.php              Fiche assuré (police, paiements, bénéficiaires, membres, réclamations, photo)
+modifier.php            Correction d’un dossier (chaque champ modifié est tracé avec son motif)
+document.php            Pièces numérisées (accès réservé aux utilisateurs connectés)
 adhesion.php            Adhésion individuelle ou familiale
 polices.php             Portefeuille de polices
 paiements.php           Encaissements, reçus, collecte du jour

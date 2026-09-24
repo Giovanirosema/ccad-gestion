@@ -192,6 +192,42 @@ CREATE TABLE IF NOT EXISTS reclamations (
   CONSTRAINT fk_recl_user   FOREIGN KEY (created_by) REFERENCES users(id)   ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
+-- Pièces justificatives numérisées (PDF, photos) : dossier assuré ou dossier de réclamation
+CREATE TABLE IF NOT EXISTS documents (
+  id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  assure_id      INT UNSIGNED  NOT NULL,
+  reclamation_id INT UNSIGNED  NULL,
+  piece          VARCHAR(80)   NOT NULL,
+  fichier        VARCHAR(64)   NOT NULL UNIQUE,
+  nom_original   VARCHAR(160)  NOT NULL,
+  mime           VARCHAR(40)   NOT NULL,
+  taille         INT UNSIGNED  NOT NULL,
+  created_by     INT UNSIGNED  NULL,
+  created_at     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_assure (assure_id),
+  KEY idx_recl (reclamation_id),
+  CONSTRAINT fk_doc_assure FOREIGN KEY (assure_id)      REFERENCES assures(id)      ON DELETE CASCADE,
+  CONSTRAINT fk_doc_recl   FOREIGN KEY (reclamation_id) REFERENCES reclamations(id) ON DELETE CASCADE,
+  CONSTRAINT fk_doc_user   FOREIGN KEY (created_by)     REFERENCES users(id)        ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- Historique des changements de plan tarifaire
+CREATE TABLE IF NOT EXISTS historique_plans (
+  id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  assure_id      INT UNSIGNED  NOT NULL,
+  ancien_plan_id INT UNSIGNED  NULL,
+  nouveau_plan_id INT UNSIGNED NOT NULL,
+  ancienne_prime DECIMAL(12,2) NOT NULL,
+  nouvelle_prime DECIMAL(12,2) NOT NULL,
+  date_effet     DATE          NOT NULL,
+  motif          VARCHAR(255)  NOT NULL,
+  created_by     INT UNSIGNED  NULL,
+  created_at     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_assure (assure_id),
+  CONSTRAINT fk_hist_assure FOREIGN KEY (assure_id) REFERENCES assures(id) ON DELETE CASCADE,
+  CONSTRAINT fk_hist_user   FOREIGN KEY (created_by) REFERENCES users(id)  ON DELETE SET NULL
+) ENGINE=InnoDB;
+
 -- Tentatives de connexion (anti force brute)
 CREATE TABLE IF NOT EXISTS login_tentatives (
   id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
