@@ -4,3 +4,4 @@ uploads/*
 *.sql.bak
 .DS_Store
 Thumbs.db
+sovgad-*.sql

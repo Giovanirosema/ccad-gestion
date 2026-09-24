@@ -8,23 +8,15 @@ Technologies : PHP 8, MySQL/MariaDB, HTML, CSS, un peu de JavaScript (sans frame
 1. Copier le dossier `ccad-gestion` dans `htdocs` (XAMPP) ou `www` (WAMP).
 2. Démarrer **Apache** et **MySQL**.
 3. Vérifier les accès à la base dans `config.php` (par défaut : `root` sans mot de passe, base `ccad`).
-4. Ouvrir `http://localhost/ccad-gestion/install.php` : la base, les tables, les plans et des données de démonstration sont créés.
+4. Ouvrir `http://localhost/ccad-gestion/install.php` : la base, les tables, les plans et le compte `admin` sont créés (aucune donnée de démonstration).
 5. **Supprimer `install.php`** une fois l’installation terminée.
 6. Se connecter sur `http://localhost/ccad-gestion/`.
 
 Autre possibilité : importer `database/schema.sql` dans phpMyAdmin, puis créer les comptes vous-même.
 
-## Comptes de démonstration
+## Premier accès
 
-Mot de passe pour tous les comptes : `ccad2026` (à changer dans Paramètres › Utilisateurs).
-
-| Identifiant   | Rôle                         |
-|---------------|------------------------------|
-| `admin`       | Administrateur               |
-| `e.baptichon` | Administrateur départemental |
-| `n.charles`   | Agent de gestion             |
-| `s.aubourg`   | Caissier                     |
-| `w.toussaint` | Agent de collecte            |
+Identifiant `admin`, mot de passe provisoire `ccad2026`. Changez-le dès la première connexion (Paramètres › Utilisateurs), puis créez les comptes du personnel.
 
 ## Structure
 
