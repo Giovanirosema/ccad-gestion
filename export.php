@@ -84,7 +84,7 @@ if ($format === 'pdf') {
     $pdf->SetAutoPageBreak(false);
     $pdf->titre = $titres[$type];
     $pdf->sousTitre = ($du && $au && !get('tout') ? 'Du ' . fdate($du) . ' au ' . fdate($au) . ' · ' : '')
-        . count($lignes) . ' ligne(s) · montants en ' . devise() . ($type === 'paiements' ? ' · total : encaissés seulement' : '');
+        . count($lignes) . ' ligne(s)' . (in_array($type, ['assures', 'polices', 'paiements', 'reclamations'], true) ? ' · montants en ' . devise() : '') . ($type === 'paiements' ? ' · total : encaissés seulement' : '');
     $pdf->auteur = current_user()['nom'];
     $pdf->tableau($colonnes ?: ['Aucune donnée'], $valeurs, array_merge($montants, $nombres), $totaux);
 
