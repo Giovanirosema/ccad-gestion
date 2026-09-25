@@ -367,8 +367,8 @@ require __DIR__ . '/includes/header.php';
       <div class="card-head"><h2>Exports</h2></div>
       <div class="card-body stack">
         <?php foreach (['assures' => 'Registre des assurés', 'polices' => 'Portefeuille de polices', 'paiements' => 'Tous les paiements', 'beneficiaires' => 'Bénéficiaires', 'reclamations' => 'Réclamations', 'audit' => 'Journal d’audit'] as $k => $l): ?>
-          <div class="list-item"><div><strong><?= e($l) ?></strong><div class="muted small">CSV UTF-8, séparateur « ; » (compatible Excel)</div></div>
-            <a class="btn btn-secondary btn-sm" href="export.php?type=<?= $k ?>&tout=1"><?= icon('download', 14) ?> Télécharger</a></div>
+          <div class="list-item"><div><strong><?= e($l) ?></strong><div class="muted small">PDF à imprimer ou archiver · CSV pour Excel</div></div>
+            <div class="row" style="gap:6px"><a class="btn btn-secondary btn-sm" href="export.php?type=<?= $k ?>&tout=1"><?= icon('download', 14) ?> PDF</a><a class="btn btn-ghost btn-sm" href="export.php?type=<?= $k ?>&tout=1&format=csv">CSV</a></div></div>
         <?php endforeach; ?>
       </div>
     </section>

@@ -123,7 +123,7 @@ require __DIR__ . '/includes/header.php';
     <div class="meta">Encaissements, reçus et collecte du jour · prochaine échéance le <?= prochaine_echeance() ?></div>
   </div>
   <div class="actions">
-    <?php if (can('rapports')): ?><a class="btn btn-secondary" href="export.php?<?= e(http_build_query(['type' => 'paiements', 'du' => $du, 'au' => $au])) ?>"><?= icon('download', 16) ?> Exporter CSV</a><?php endif; ?>
+    <?php if (can('rapports')): ?><a class="btn btn-secondary" href="export.php?<?= e(http_build_query(['type' => 'paiements', 'du' => $du, 'au' => $au])) ?>"><?= icon('download', 16) ?> Exporter PDF</a><a class="btn btn-ghost btn-sm" href="export.php?<?= e(http_build_query(['type' => 'paiements', 'du' => $du, 'au' => $au] + ['format' => 'csv'])) ?>" title="Pour Excel">CSV</a><?php endif; ?>
     <a class="btn btn-primary" href="#encaisser"><?= icon('card', 16) ?> Nouvel encaissement</a>
   </div>
 </div>

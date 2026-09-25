@@ -38,7 +38,8 @@ require __DIR__ . '/includes/header.php';
     <div class="meta">Contrats en portefeuille · éligibilité après <?= $elig ?> mois de cotisation</div>
   </div>
   <div class="actions">
-    <a class="btn btn-secondary" href="export.php?type=polices"><?= icon('download', 16) ?> Exporter CSV</a>
+    <a class="btn btn-secondary" href="export.php?type=polices"><?= icon('download', 16) ?> Exporter PDF</a>
+    <a class="btn btn-ghost btn-sm" href="export.php?type=polices&format=csv" title="Pour Excel">CSV</a>
     <a class="btn btn-primary" href="adhesion.php"><?= icon('user-plus', 16) ?> Nouvelle adhésion</a>
   </div>
 </div>
