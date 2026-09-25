@@ -36,7 +36,8 @@ require __DIR__ . '/includes/header.php';
     <div class="meta"><?= $total ?> dossier(s) correspondant(s)<?= $q !== '' ? ' à « ' . e($q) . ' »' : '' ?></div>
   </div>
   <div class="actions">
-    <a class="btn btn-secondary" href="export.php?type=assures"><?= icon('download', 16) ?> Exporter CSV</a>
+    <a class="btn btn-secondary" href="export.php?type=assures"><?= icon('download', 16) ?> Exporter PDF</a>
+    <a class="btn btn-ghost btn-sm" href="export.php?type=assures&format=csv" title="Pour Excel">CSV</a>
     <a class="btn btn-secondary" href="adhesion.php?type=famille"><?= icon('users', 16) ?> Plan familial</a>
     <a class="btn btn-primary" href="adhesion.php?type=individuel"><?= icon('user-plus', 16) ?> Plan individuel</a>
   </div>

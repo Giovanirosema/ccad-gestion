@@ -42,7 +42,57 @@ $sql = str_replace('%PERIODE%', $periode, $sql);
 $params = $type === 'audit' ? $pp : array_merge($sp, $pp);
 $lignes = rows($sql, $params);
 
-audit('Export', strtoupper($type), count($lignes) . ' ligne(s) exportée(s)');
+$format = get('format', 'pdf') === 'csv' ? 'csv' : 'pdf';
+audit('Export', strtoupper($type), count($lignes) . ' ligne(s) exportée(s) · ' . strtoupper($format));
+
+if ($format === 'pdf') {
+    require_once __DIR__ . '/includes/pdf_export.php';
+    $titres = ['assures' => 'Registre des assurés', 'polices' => 'Portefeuille de polices', 'beneficiaires' => 'Bénéficiaires',
+               'paiements' => 'Journal des paiements', 'reclamations' => 'Dossiers de réclamation', 'audit' => 'Journal d’audit'];
+    $dates = ['Naissance', 'Adhésion', 'Décès', "Couvert jusqu'au"];
+    $montants = ['Prime', 'Capital', 'Montant', 'Arriérés', 'Frais', 'Net'];
+    $nombres = ['Mois', 'Part (%)'];
+    // Colonnes secondaires retirées du PDF pour garder un tableau lisible sur une page A4 (elles restent dans l'export CSV)
+    $masquer = ['assures' => ['Référence', 'Sexe', 'NIF', 'Adresse', 'Devise'], 'polices' => ['Devise'], 'paiements' => ['Devise'], 'audit' => ['Zone']];
+
+    $colonnes = $lignes ? array_values(array_diff(array_keys($lignes[0]), $masquer[$type] ?? [])) : [];
+    $totaux = [];
+    $sommes = array_fill_keys(array_intersect($colonnes, $montants), 0.0);
+    $valeurs = [];
+    foreach ($lignes as $l) {
+        $row = [];
+        foreach ($colonnes as $c) {
+            $v = $l[$c];
+            // Paiements annulés ou à valider : listés, mais hors du total
+            if (isset($sommes[$c]) && !($type === 'paiements' && $l['Statut'] !== 'Encaissé')) $sommes[$c] += (float)$v;
+            if ($v === null || $v === '') $v = '—';
+            elseif (in_array($c, $dates, true)) $v = fdate($v);
+            elseif ($c === 'Date') $v = strlen((string)$v) > 10 ? date('d/m/Y H:i', strtotime($v)) : fdate($v);
+            elseif (in_array($c, $montants, true)) $v = money($v);
+            elseif ($c === 'Part (%)') $v = rtrim(rtrim((string)$v, '0'), '.') . ' %';
+            elseif ($c === 'Sexe') $v = $v === 'F' ? 'F' : 'M';
+            elseif ($c === 'Type') $v = $v === 'famille' ? 'Familial' : 'Individuel';
+            $row[] = (string)$v;
+        }
+        $valeurs[] = $row;
+    }
+    foreach ($sommes as $c => $s) $totaux[$c] = money($s);
+
+    $pdf = new CcadPdf('L', 'mm', 'A4');
+    $pdf->SetTitle(CcadPdf::t($titres[$type] . ' · CCAD'));
+    $pdf->SetAuthor(CcadPdf::t(current_user()['nom']));
+    $pdf->SetAutoPageBreak(false);
+    $pdf->titre = $titres[$type];
+    $pdf->sousTitre = ($du && $au && !get('tout') ? 'Du ' . fdate($du) . ' au ' . fdate($au) . ' · ' : '')
+        . count($lignes) . ' ligne(s) · montants en ' . devise() . ($type === 'paiements' ? ' · total : encaissés seulement' : '');
+    $pdf->auteur = current_user()['nom'];
+    $pdf->tableau($colonnes ?: ['Aucune donnée'], $valeurs, array_merge($montants, $nombres), $totaux);
+
+    $nom = 'ccad-' . $type . '-' . date('Ymd-His') . '.pdf';
+    header('Cache-Control: private, no-store');
+    $pdf->Output('D', $nom);
+    exit;
+}
 
 $nom = 'ccad-' . $type . '-' . date('Ymd-His') . '.csv';
 header('Content-Type: text/csv; charset=UTF-8');

@@ -53,7 +53,7 @@ require __DIR__ . '/includes/header.php';
     <div class="meta"><?= $plan ? 'Plan filtré · ' : '' ?><?= $dept !== '' ? e($dept) . ' · ' : 'Tous départements · ' ?>montants en <?= e($devise) ?></div>
   </div>
   <div class="actions no-print">
-    <a class="btn btn-secondary" href="export.php?<?= e(http_build_query(['type' => 'paiements', 'du' => "$annee-01-01", 'au' => "$annee-12-31"])) ?>"><?= icon('download', 16) ?> Exporter les paiements</a>
+    <a class="btn btn-secondary" href="export.php?<?= e(http_build_query(['type' => 'paiements', 'du' => "$annee-01-01", 'au' => "$annee-12-31"])) ?>"><?= icon('download', 16) ?> Exporter PDF</a><a class="btn btn-ghost btn-sm" href="export.php?<?= e(http_build_query(['type' => 'paiements', 'du' => "$annee-01-01", 'au' => "$annee-12-31"] + ['format' => 'csv'])) ?>" title="Pour Excel">CSV</a>
     <a class="btn btn-primary" target="_blank" href="imprimer.php?<?= e(http_build_query(['doc' => 'rapport', 'annee' => $annee, 'plan' => $plan ?: '', 'departement' => $dept])) ?>"><?= icon('printer', 16) ?> Imprimer le rapport</a>
   </div>
 </div>

@@ -40,11 +40,13 @@ parametres.php          Plans, formules, services, infos de la compagnie, règle
 mon-compte.php          Changement de mot de passe et activité de connexion
 photo.php               Photos d’identité (accès réservé aux utilisateurs connectés)
 imprimer.php            Documents imprimables (A4 ou ticket 80 mm)
-export.php              Exports CSV (compatibles Excel)
+export.php              Exports PDF (par défaut) et CSV (Excel)
 includes/               Fonctions, en-tête et pied de page
 assets/css/style.css    Styles (charte CCAD)
 assets/js/app.js        Interactions (communes, plans, lignes dynamiques, montant auto)
 database/schema.sql     Schéma MySQL et données de référence
+database/schema-hebergeur.sql  Même schéma sans CREATE DATABASE, avec le compte admin (import phpMyAdmin chez l’hébergeur)
+includes/lib/fpdf/      Bibliothèque FPDF 1.86 (exports PDF)
 uploads/                Photos d’identité
 ```
 
@@ -64,7 +66,7 @@ uploads/                Photos d’identité
 ## Hébergement gratuit (InfinityFree)
 
 1. Créer un compte sur https://www.infinityfree.com puis un site (sous-domaine gratuit).
-2. Dans « MySQL Databases », créer une base et noter : hôte, nom de la base, utilisateur, mot de passe.
+2. Dans « MySQL Databases », créer une base et noter : hôte, nom de la base, utilisateur, mot de passe. Dans phpMyAdmin de l’hébergeur, importer `database/schema-hebergeur.sql` (et non `schema.sql`, refusé car il contient CREATE DATABASE).
 3. Copier `config.local.example.php` en `config.local.php` et y mettre les accès de l’étape 2.
 4. Envoyer tous les fichiers dans `htdocs/` (gestionnaire de fichiers ou FTP avec FileZilla).
 5. Ouvrir `https://votre-site/install.php` pour créer les tables et les comptes, puis supprimer `install.php`.

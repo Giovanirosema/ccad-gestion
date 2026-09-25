@@ -36,7 +36,7 @@ require __DIR__ . '/includes/header.php';
     <h1>Journal d’audit</h1>
     <div class="meta">Trace de toutes les opérations · non modifiable · <?= $total ?> événement(s) sur la période</div>
   </div>
-  <div class="actions"><a class="btn btn-secondary" href="export.php?<?= e(http_build_query(['type' => 'audit', 'du' => $du, 'au' => $au])) ?>"><?= icon('download', 16) ?> Exporter CSV</a></div>
+  <div class="actions"><a class="btn btn-secondary" href="export.php?<?= e(http_build_query(['type' => 'audit', 'du' => $du, 'au' => $au])) ?>"><?= icon('download', 16) ?> Exporter PDF</a><a class="btn btn-ghost btn-sm" href="export.php?<?= e(http_build_query(['type' => 'audit', 'du' => $du, 'au' => $au] + ['format' => 'csv'])) ?>" title="Pour Excel">CSV</a></div>
 </div>
 
 <section class="card card-flush">
